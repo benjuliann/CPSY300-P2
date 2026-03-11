@@ -1,40 +1,57 @@
 import loadCSV from "../../../lib/loadCSV";
 
 function assignCluster(recipe) {
-  const protein = parseFloat(recipe["Protein(g)"]) || 0;
-  const carbs = parseFloat(recipe["Carbs(g)"]) || 0;
-  const fat = parseFloat(recipe["Fat(g)"]) || 0;
+  const protein = recipe["Protein(g)"];
+  const carbs = recipe["Carbs(g)"];
+  const fat = recipe["Fat(g)"];
 
-  if (protein > 150 || fat > 140) return 1; //high-protein / high-fat
-  if (protein > 50 && carbs < 200) return 2; // medium-protein
-  return 3; // low-protein / high-carb
+  if (protein > 150 || fat > 140) return 1;
+  if (protein > 50 && carbs < 200) return 2;
+  return 3;
 }
 
 export async function GET(request) {
-  const data = await loadCSV();
+  try {
+    const data = await loadCSV();
 
-  const { searchParams } = new URL(request.url);
-  const limit = parseInt(searchParams.get("limit")) || 200;
-  const diet = searchParams.get("diet");
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get("limit")) || 200;
+    const diet = searchParams.get("diet");
 
-  // filter by diet if given
-  let filtered = diet && diet !== "all"
-    ? data.filter(row => row.Diet_type?.toLowerCase() === diet.toLowerCase())
-    : data;
+    let filtered = diet && diet.toLowerCase() !== "all"
+      ? data.filter(row => row.Diet_type?.toLowerCase() === diet.toLowerCase())
+      : data;
 
-  const sliced = filtered.slice(0, limit);
+    const sliced = filtered.slice(0, limit);
 
-  const clusters = sliced.map(row => ({
-    diet: row.Diet_type.toLowerCase(),
-    recipe: row.Recipe_name,
-    protein: parseFloat(row["Protein(g)"]) || 0,
-    carbs: parseFloat(row["Carbs(g)"]) || 0,
-    fat: parseFloat(row["Fat(g)"]) || 0,
-    cluster: assignCluster(row)
-  }));
+    const clusters = sliced.map(row => {
+      const recipeData = {
+        ...row,
+        "Protein(g)": parseFloat(row["Protein(g)"]) || 0,
+        "Carbs(g)": parseFloat(row["Carbs(g)"]) || 0,
+        "Fat(g)": parseFloat(row["Fat(g)"]) || 0
+      };
 
-  return new Response(JSON.stringify(clusters), {
-    status: 200,
-    headers: { "Content-Type": "application/json" }
-  });
+      return {
+        diet: recipeData.Diet_type.toLowerCase(),
+        recipe: recipeData.Recipe_name,
+        protein: recipeData["Protein(g)"],
+        carbs: recipeData["Carbs(g)"],
+        fat: recipeData["Fat(g)"],
+        cluster: assignCluster(recipeData)
+      };
+    });
+
+    return new Response(JSON.stringify(clusters), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+
+  } catch (err) {
+    console.error("Error loading recipes:", err);
+    return new Response(JSON.stringify({ error: "Failed to load recipes" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 }
