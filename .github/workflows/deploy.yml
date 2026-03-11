@@ -48,18 +48,18 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             # Pull the latest image
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
 
             # Stop and remove the old container (ignore errors if not found)
-            docker stop my-app || true
-            docker rm my-app || true
+            sudo docker stop my-app || true
+            sudo docker rm my-app || true
 
             # Run the new container
-            docker run -d \
+            sudo docker run -d \
               --name my-app \
               --restart unless-stopped \
               -p 80:3000 \
               ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
 
             # Clean up unused images to save space
-            docker image prune -f
+            sudo docker image prune -f
