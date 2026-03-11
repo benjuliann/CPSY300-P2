@@ -10,56 +10,56 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Setup Node
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '25.x'
 
-      # Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build Docker image
+      # Build with the correct repository name
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest .
+        run: docker build -t bucketmonkey/projwebapp:latest .
 
-      # Push Docker image
+      # Push with the correct repository name
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
+        run: docker push bucketmonkey/projwebapp:latest
 
-      # Deploy to Azure VM
       - name: Deploy to Azure VM via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT || 22 }}
           script: |
             # Pull the latest image
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
+            sudo docker pull bucketmonkey/projwebapp:latest
 
-            # Stop and remove the old container (ignore errors if not found)
-            sudo docker stop my-app || true
-            sudo docker rm my-app || true
+            # Stop and remove any container using port 80
+            sudo docker ps -q --filter "publish=80" | xargs -r sudo docker stop
+            sudo docker ps -aq --filter "publish=80" | xargs -r sudo docker rm
+
+            # Also stop/remove the container with our specific name (just in case)
+            sudo docker stop projwebapp || true
+            sudo docker rm projwebapp || true
 
             # Run the new container
             sudo docker run -d \
-              --name my-app \
+              --name projwebapp \
               --restart unless-stopped \
               -p 80:3000 \
-              ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
+              bucketmonkey/projwebapp:latest
 
-            # Clean up unused images to save space
+            # Clean up unused images
             sudo docker image prune -f
